@@ -4,7 +4,8 @@ namespace SettingsProviderNet
 {
     public interface ISettingsStorage
     {
-        void Save(string key, Dictionary<string, string> settings);
-        Dictionary<string, string> Load(string key);
+        void Save<T>(string key, T settings);
+        T Load<T>(string key) where T : new();
+        T LoadAndUpdate<T>(string key, T settings);
     }
 }

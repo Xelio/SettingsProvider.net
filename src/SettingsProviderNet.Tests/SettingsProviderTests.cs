@@ -179,7 +179,7 @@ namespace SettingsProviderNet.Tests
         }
 
         [Fact]
-        public void settings_provider_recycles_same_instance_on_reset()
+        public void settings_provider_recycles_same_instance_on_reset_to_default()
         {
             // arrange
             var instance = settingsRetreiver.GetSettings<TestSettings>();
@@ -187,11 +187,23 @@ namespace SettingsProviderNet.Tests
 
             // act
             var settings = settingsRetreiver.ResetToDefaults<TestSettings>();
-            var settings2 = settingsRetreiver.GetSettings<TestSettings>();
 
             // assert
             Assert.Same(instance, settings);
-            Assert.Same(instance, settings2);
+        }
+
+        [Fact]
+        public void settings_provider_recycles_same_instance_on_save_and_get()
+        {
+            // arrange
+            var instance = settingsRetreiver.GetSettings<TestSettings>();
+            settingsSaver.SaveSettings(new TestSettings { TestProp1 = "bar" });
+
+            // act
+            var settings = settingsRetreiver.GetSettings<TestSettings>();
+
+            // assert
+            Assert.Same(instance, settings);
         }
 
         [Fact]
@@ -238,45 +250,46 @@ namespace SettingsProviderNet.Tests
         [Fact]
         public void CanSpecifyKey()
         {
-            store.Save("TestSettings", new Dictionary<string, string>
-            {
-                {"OriginalName", "\"Value\""}
-            });
+            throw new NotImplementedException();
+        //    store.Save("TestSettings", new Dictionary<string, string>
+        //    {
+        //        {"OriginalName", "\"Value\""}
+        //    });
 
-            var settings = settingsRetreiver.GetSettings<TestSettings>();
+        //    var settings = settingsRetreiver.GetSettings<TestSettings>();
 
-            Assert.Equal("Value", settings.RenamedProperty);
+        //    Assert.Equal("Value", settings.RenamedProperty);
         }
 
         [Fact]
         public void CanLoadLegacySettings()
         {
-            store.Save("TestSettings", new Dictionary<string, string>
-            {
-                {"SettingsProviderNet.Tests.TestSettings.TestProp1", "Value"},
-                {"SettingsProviderNet.Tests.TestSettings.SomeEnum", "Value2"},
-                {"SettingsProviderNet.Tests.TestSettings.TestProp2", "2"},
-                {"SettingsProviderNet.Tests.TestSettings.Boolean", "False"}
-            });
+            throw new NotImplementedException();
+            //store.Save("TestSettings", new Dictionary<string, string>
+            //{
+            //    {"SettingsProviderNet.Tests.TestSettings.TestProp1", "Value"},
+            //    {"SettingsProviderNet.Tests.TestSettings.SomeEnum", "Value2"},
+            //    {"SettingsProviderNet.Tests.TestSettings.TestProp2", "2"},
+            //    {"SettingsProviderNet.Tests.TestSettings.Boolean", "False"}
+            //});
 
-            var settings = settingsRetreiver.GetSettings<TestSettings>();
+            //var settings = settingsRetreiver.GetSettings<TestSettings>();
 
-            Assert.Equal("Value", settings.TestProp1);
-            Assert.Equal(MyEnum.Value2, settings.SomeEnum);
-            Assert.Equal(2, settings.TestProp2);
-            Assert.False(settings.Boolean);
+            //Assert.Equal("Value", settings.TestProp1);
+            //Assert.Equal(MyEnum.Value2, settings.SomeEnum);
+            //Assert.Equal(2, settings.TestProp2);
+            //Assert.False(settings.Boolean);
         }
 
-        [Fact]
-        public void SettingsAreNotFullyQualified()
-        {
-            settingsRetreiver.SaveSettings(new TestSettings
-            {
-                TestProp1 = "Value"
-            });
-
-            Assert.True(store.Load("TestSettings").ContainsKey("TestProp1"));
-        }
+        //[Fact]
+        //public void SettingsAreNotFullyQualified()
+        //{
+        //    settingsRetreiver.SaveSettings(new TestSettings
+        //    {
+        //        TestProp1 = "Value"
+        //    });
+        //    Assert.True(store.Load("TestSettings").ContainsKey("TestProp1"));
+        //}
 
         [Fact]
         public void CanSerialiseComplexTypes()

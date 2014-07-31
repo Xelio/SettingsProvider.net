@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Text;
 
 namespace SettingsProviderNet
 {
@@ -17,13 +18,13 @@ namespace SettingsProviderNet
             var settingsFolder = GetSettingsFolder();
             if (!Directory.Exists(settingsFolder))
                 Directory.CreateDirectory(settingsFolder);
-            File.WriteAllText(Path.Combine(settingsFolder, filename), fileContents);
+            File.WriteAllText(Path.Combine(settingsFolder, filename), fileContents, Encoding.UTF8);
         }
 
         protected override string ReadTextFile(string filename)
         {
             var settingsFilename = Path.Combine(GetSettingsFolder(), filename);
-            return File.Exists(settingsFilename) ? File.ReadAllText(settingsFilename) : null;
+            return File.Exists(settingsFilename) ? File.ReadAllText(settingsFilename, Encoding.UTF8) : null;
         }
 
         private string GetSettingsFolder()

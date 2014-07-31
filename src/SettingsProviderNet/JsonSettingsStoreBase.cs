@@ -1,41 +1,51 @@
+using Newtonsoft.Json;
 using System.Collections.Generic;
 using System.IO;
-using System.Runtime.Serialization.Json;
 using System.Text;
 
 namespace SettingsProviderNet
 {
     public abstract class JsonSettingsStoreBase : ISettingsStorage
     {
-        public void Save(string key, Dictionary<string, string> settings)
+        protected abstract void WriteTextFile(string filename, string fileContents);
+        
+        protected abstract string ReadTextFile(string filename);
+
+        public void Save<T>(string key, T settings)
         {
             var filename = key + ".settings";
 
-            var serializer = new DataContractJsonSerializer(typeof(Dictionary<string, string>));
-            var ms = new MemoryStream();
-            var writer = JsonReaderWriterFactory.CreateJsonWriter(ms, Encoding.Unicode);
-            serializer.WriteObject(ms, settings);
-            writer.Flush();
-            var jsonString = Encoding.Default.GetString(ms.ToArray());
+            string jsonString = JsonConvert.SerializeObject(settings, Formatting.Indented, new Newtonsoft.Json.JsonSerializerSettings
+            {
+                NullValueHandling = NullValueHandling.Include,
+                ReferenceLoopHandling = ReferenceLoopHandling.Ignore,
+                StringEscapeHandling = StringEscapeHandling.EscapeHtml
+            });
+
             WriteTextFile(filename, jsonString);
         }
 
-        protected abstract void WriteTextFile(string filename, string fileContents);
-
-        public Dictionary<string, string> Load(string key)
+        public T Load<T>(string key) where T : new()
         {
-            var filename = key + ".settings";
-
-            var readTextFile = ReadTextFile(filename);
-            if (!string.IsNullOrEmpty(readTextFile))
-            {
-                var serializer = new DataContractJsonSerializer(typeof(Dictionary<string, string>));
-                return (Dictionary<string, string>)serializer.ReadObject(new MemoryStream(Encoding.Default.GetBytes(readTextFile)));
-            }
-
-            return new Dictionary<string, string>();
+            return LoadAndUpdate(key, new T());
         }
 
-        protected abstract string ReadTextFile(string filename);
+        public T LoadAndUpdate<T>(string key, T settings)
+        {
+            var filename = key + ".settings";
+            var readTextFile = ReadTextFile(filename);
+
+            if (!string.IsNullOrEmpty(readTextFile))
+            {
+                JsonConvert.PopulateObject(readTextFile, settings, new Newtonsoft.Json.JsonSerializerSettings
+                {
+                    NullValueHandling = NullValueHandling.Ignore,
+                    ReferenceLoopHandling = ReferenceLoopHandling.Ignore,
+                    StringEscapeHandling = StringEscapeHandling.EscapeHtml
+                });
+            }
+
+            return settings;
+        }
     }
 }

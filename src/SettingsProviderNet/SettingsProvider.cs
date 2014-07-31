@@ -22,79 +22,58 @@ namespace SettingsProviderNet
             this.secretKey = secretKey;
         }
 
+        static string GetKey<T>()
+        {
+            return typeof(T).Name;
+        }
+
         public virtual T GetSettings<T>(bool fresh = false) where T : new()
         {
             var type = typeof (T);
             if (!fresh && cache.ContainsKey(type))
                 return (T)cache[type];
 
-            var settingsLookup = settingsRepository.Load(GetKey<T>());
+            var settings = GetDefaultSettings<T>();
+
+            settings = settingsRepository.LoadAndUpdate(GetKey<T>(), settings);
+
+            cache[type] = settings;
+
+            return settings;
+        }
+
+        T GetDefaultSettings<T>() where T : new()
+        {
             var settings = new T();
-            var settingMetadata = ReadSettingMetadata<T>();
-
-            foreach (var setting in settingMetadata)
+            var settingsMetadata = ReadSettingMetadata<T>();
+            foreach (var setting in settingsMetadata)
             {
-                // Write over it using the stored value if exists
-                var legacyKey = GetLegacyKey<T>(setting);
-                object value;
-                if (settingsLookup.ContainsKey(setting.Key)) 
-                    value = ConvertValue(settingsLookup[setting.Key], setting);
-                else if (settingsLookup.ContainsKey(legacyKey))
-                    value = ConvertValue(settingsLookup[legacyKey], setting);
-                else
-                    value = GetDefaultValue(setting);
-
-                setting.Write(settings, value);
+                setting.Write(settings, GetDefaultValue(setting));
             }
-
-            cache[typeof(T)] = settings;
-
             return settings;
         }
 
         object GetDefaultValue(ISettingDescriptor setting)
         {
-            var value = setting.DefaultValue ?? ConvertValue(null, setting);
+            var value = setting.DefaultValue ?? GetDefault(setting.Property.PropertyType);
 
             if (setting.IsProtected && value != null)
                 value = ProtectedDataUtils.Encrypt((string)value, secretKey ?? typeof(SettingDescriptor).FullName);
-            
+
             return value;
-        }
-
-        static string GetKey<T>()
-        {
-            return typeof(T).Name;
-        }
-
-        object ConvertValue(string storedValue, ISettingDescriptor setting)
-        {
-            var propertyType = setting.Property.PropertyType;
-            var isList = IsList(propertyType);
-            if (isList && string.IsNullOrEmpty(storedValue)) return CreateListInstance(propertyType);
-            if (string.IsNullOrEmpty(storedValue)) return GetDefault(propertyType);
-            if (setting.UnderlyingType.IsEnum) return Enum.Parse(setting.UnderlyingType, storedValue);
-            if (!string.IsNullOrEmpty(storedValue) && setting.UnderlyingType == typeof(string) && !storedValue.StartsWith("\""))
-                storedValue = string.Format("\"{0}\"", storedValue);
-            if (setting.UnderlyingType == typeof (bool))
-                storedValue = storedValue.ToLower();
-
-            return new DataContractJsonSerializer(setting.UnderlyingType)
-                .ReadObject(new MemoryStream(Encoding.Default.GetBytes(storedValue)));
         }
 
         static object GetDefault(Type type)
         {
+            if (IsList(type))
+            {
+                return Activator.CreateInstance(type.IsClass ? type : typeof(List<>).MakeGenericType(type.GetGenericArguments()[0]));
+            }
             if (type.IsValueType)
             {
                 return Activator.CreateInstance(type);
             }
             return null;
-        }
-
-        private static object CreateListInstance(Type propertyType)
-        {
-            return Activator.CreateInstance(propertyType.IsClass ? propertyType : typeof(List<>).MakeGenericType(propertyType.GetGenericArguments()[0]));
         }
 
         private static bool IsList(Type propertyType)
@@ -104,40 +83,23 @@ namespace SettingsProviderNet
                 (propertyType.IsGenericType && typeof(IList<>) == propertyType.GetGenericTypeDefinition());
         }
 
-        public virtual void SaveSettings<T>(T settingsToSave)
+        public virtual void SaveSettings<T>(T settings) where T : new()
         {
-            cache[typeof (T)] = settingsToSave;
+            var type = typeof(T);
+            T oldSettings = cache.ContainsKey(type) ? (T)cache[type] : new T();
+            T defaultSettings = GetDefaultSettings<T>();
 
-            var settings = new Dictionary<string, string>();
             var settingsMetadata = ReadSettingMetadata<T>();
 
             foreach (var setting in settingsMetadata)
             {
-                var value = setting.ReadValue(settingsToSave) ?? setting.DefaultValue;
-                // Give enum a default
-                if (setting.UnderlyingType.IsEnum)
-                {
-                    if (value == null)
-                        value = EnumHelper.GetValues(setting.UnderlyingType).First();
-
-                    settings[setting.Key] = value.ToString();
-                }
-                else if (value != null)
-                {
-                    var ms = new MemoryStream();
-                    var writer = JsonReaderWriterFactory.CreateJsonWriter(ms, Encoding.Unicode);
-                    new DataContractJsonSerializer(setting.UnderlyingType).WriteObject(ms, value);
-                    writer.Flush();
-                    var jsonString = Encoding.Default.GetString(ms.ToArray());
-
-                    settings[setting.Key] = jsonString;
-                }
-                else
-                {
-                    settings[setting.Key] =  string.Empty;
-                }
+                var value = setting.ReadValue(settings) ?? setting.ReadValue(defaultSettings);
+                setting.Write(oldSettings, value);
             }
-            settingsRepository.Save(GetKey<T>(), settings);
+
+            cache[typeof(T)] = oldSettings;
+
+            settingsRepository.Save<T>(GetKey<T>(), (T)oldSettings);
         }
 
         internal static string GetLegacyKey<T>(ISettingDescriptor setting)
@@ -162,23 +124,28 @@ namespace SettingsProviderNet
 
         public virtual T ResetToDefaults<T>() where T : new()
         {
-            settingsRepository.Save(GetKey<T>(), new Dictionary<string, string>());
+            T settings;
 
             var type = typeof (T);
             if (cache.ContainsKey(type))
             {
-                var cachedCopy = cache[type];
+                settings = (T)cache[type];
                 var settingMetadata = ReadSettingMetadata<T>();
 
                 foreach (var setting in settingMetadata)
                 {
-                    setting.Write(cachedCopy, GetDefaultValue(setting));
+                    setting.Write(settings, GetDefaultValue(setting));
                 }
 
-                return (T)cachedCopy;
+            }
+            else
+            {
+                settings = GetDefaultSettings<T>();
             }
 
-            return GetSettings<T>();
+            SaveSettings<T>(settings);
+
+            return settings;
         }
     }
 
