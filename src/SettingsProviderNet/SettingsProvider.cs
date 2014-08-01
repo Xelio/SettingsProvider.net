@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Dynamic;
 using System.IO;
 using System.Linq;
 using System.Runtime.Serialization.Json;
@@ -12,9 +13,9 @@ namespace SettingsProviderNet
 
     public class SettingsProvider : ISettingsProvider
     {
-        readonly ISettingsStorage settingsRepository;
-        readonly Dictionary<Type, object> cache = new Dictionary<Type, object>();
-        readonly string secretKey;
+        protected readonly ISettingsStorage settingsRepository;
+        protected readonly Dictionary<Type, object> cache = new Dictionary<Type, object>();
+        protected readonly string secretKey;
 
         public SettingsProvider(ISettingsStorage settingsRepository = null, string secretKey = null)
         {
@@ -22,7 +23,7 @@ namespace SettingsProviderNet
             this.secretKey = secretKey;
         }
 
-        static string GetKey<T>()
+        protected virtual string GetKey<T>()
         {
             return typeof(T).Name;
         }
@@ -35,20 +36,43 @@ namespace SettingsProviderNet
 
             var settings = GetDefaultSettings<T>();
 
-            settings = settingsRepository.LoadAndUpdate(GetKey<T>(), settings);
+            // Fill in settings got from repository and decrypt protected setting
+            settings = DecryptProtectedSettings(
+                    settingsRepository.LoadAndUpdate(GetKey<T>(), settings)
+                );
 
             cache[type] = settings;
 
             return settings;
         }
 
-        T GetDefaultSettings<T>() where T : new()
+        protected T DecryptProtectedSettings<T>(T settings)
+        {
+            var settingsMetadata = ReadSettingMetadata<T>();
+            foreach (var setting in settingsMetadata)
+            {
+                if (setting.IsProtected)
+                {
+                    // Only run decrypt on string
+                    var value = setting.ReadValue(settings);
+                    var str = value as string;
+                    var decryptedValue = String.IsNullOrEmpty(str)
+                                        ? value
+                                        : ProtectedDataUtils.Decrypt(str, secretKey ?? typeof(SettingDescriptor).FullName);
+                    setting.WriteValue(settings, decryptedValue);
+                }
+            }
+            return settings;
+        }
+
+        // Protected settings are encrypted
+        protected virtual T GetDefaultSettings<T>() where T : new()
         {
             var settings = new T();
             var settingsMetadata = ReadSettingMetadata<T>();
             foreach (var setting in settingsMetadata)
             {
-                setting.Write(settings, GetDefaultValue(setting));
+                setting.WriteValue(settings, GetDefaultValue(setting));
             }
             return settings;
         }
@@ -62,7 +86,7 @@ namespace SettingsProviderNet
 
             return value;
         }
-
+        
         static object GetDefault(Type type)
         {
             if (IsList(type))
@@ -85,21 +109,44 @@ namespace SettingsProviderNet
 
         public virtual void SaveSettings<T>(T settings) where T : new()
         {
+            SaveSettings(settings, true);
+        }
+
+        protected void SaveSettings<T>(T settings, bool saveDefaultValue) where T : new()
+        {
             var type = typeof(T);
-            T oldSettings = cache.ContainsKey(type) ? (T)cache[type] : new T();
-            T defaultSettings = GetDefaultSettings<T>();
+            // Retain orignal instance
+            var oldSettings = cache.ContainsKey(type) ? (T)cache[type] : new T();
+            // Decrypt for compare
+            var defaultSettings = DecryptProtectedSettings(GetDefaultSettings<T>());
+            // Use ExpandoObject to handle saving, which allow us to skip saving default value
+            IDictionary<string, Object> settingToSave = new ExpandoObject();
 
             var settingsMetadata = ReadSettingMetadata<T>();
-
             foreach (var setting in settingsMetadata)
             {
-                var value = setting.ReadValue(settings) ?? setting.ReadValue(defaultSettings);
-                setting.Write(oldSettings, value);
+                // Replace null with defaultValue, write result to oldSettings
+                var defaultValue = setting.ReadValue(defaultSettings);
+                var value = setting.ReadValue(settings) ?? defaultValue;
+                setting.WriteValue(oldSettings, value);
+
+                // Hack for comparing string
+                string str = value as string;
+                string defaultStr = defaultValue as string;
+                bool IsStringAndEqual = str != null && defaultStr != null && str == defaultStr;
+
+                if (saveDefaultValue || ((value != defaultValue) && !IsStringAndEqual))
+                {
+                    settingToSave[setting.Key] = !setting.IsProtected || String.IsNullOrEmpty(str)
+                                                ? value
+                                                : ProtectedDataUtils.Encrypt(str, secretKey ?? typeof(SettingDescriptor).FullName);
+                }
             }
 
+            // Update cache
             cache[typeof(T)] = oldSettings;
 
-            settingsRepository.Save<T>(GetKey<T>(), (T)oldSettings);
+            settingsRepository.Save<ExpandoObject>(GetKey<T>(), settingToSave as ExpandoObject);
         }
 
         internal static string GetLegacyKey<T>(ISettingDescriptor setting)
@@ -124,24 +171,16 @@ namespace SettingsProviderNet
 
         public virtual T ResetToDefaults<T>() where T : new()
         {
-            T settings;
-
             var type = typeof (T);
-            if (cache.ContainsKey(type))
-            {
-                settings = (T)cache[type];
-                var settingMetadata = ReadSettingMetadata<T>();
+            T settings = cache.ContainsKey(type) ? (T)cache[type] : new T();
 
-                foreach (var setting in settingMetadata)
-                {
-                    setting.Write(settings, GetDefaultValue(setting));
-                }
-
-            }
-            else
+            var settingMetadata = ReadSettingMetadata<T>();
+            foreach (var setting in settingMetadata)
             {
-                settings = GetDefaultSettings<T>();
+                setting.WriteValue(settings, GetDefaultValue(setting));
             }
+
+            settings = DecryptProtectedSettings(settings);
 
             SaveSettings<T>(settings);
 

@@ -20,7 +20,7 @@ namespace SettingsProviderNet
         /// </summary>
         Type UnderlyingType { get; }
 
-        void Write(object settings, object value);
+        void WriteValue(object settings, object value);
         object ReadValue(object settings);
         event PropertyChangedEventHandler PropertyChanged;
     }

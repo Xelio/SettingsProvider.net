@@ -50,9 +50,14 @@ namespace SettingsProviderNet
 
         public bool IsProtected { get; private set; }
 
-        public virtual void Write(object settings, object value)
+        public virtual void WriteValue(object settings, object value)
         {
-            property.SetValue(settings, IsProtected ? Decrypt(value) : value, null);
+            property.SetValue(settings, value, null);
+        }
+
+        public virtual object ReadValue(object settings)
+        {
+            return property.GetValue(settings, null);
         }
 
         protected virtual object Encrypt(object value)
@@ -78,12 +83,6 @@ namespace SettingsProviderNet
                     return property.PropertyType.GetGenericArguments()[0];
                 return property.PropertyType;
             }
-        }
-
-        public virtual object ReadValue(object settings)
-        {
-            var value = property.GetValue(settings, null);
-            return IsProtected ? Encrypt(value) : value;
         }
 
         public event PropertyChangedEventHandler PropertyChanged;
