@@ -2,10 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Dynamic;
-using System.IO;
 using System.Linq;
-using System.Runtime.Serialization.Json;
-using System.Text;
 
 namespace SettingsProviderNet
 {
@@ -132,10 +129,8 @@ namespace SettingsProviderNet
 
                 // Hack for comparing string
                 string str = value as string;
-                string defaultStr = defaultValue as string;
-                bool IsStringAndEqual = str != null && defaultStr != null && str == defaultStr;
 
-                if (saveDefaultValue || ((value != defaultValue) && !IsStringAndEqual))
+                if (saveDefaultValue || !ObjectCompareUtil.IsEqual(value, defaultValue))
                 {
                     settingToSave[setting.Key] = !setting.IsProtected || String.IsNullOrEmpty(str)
                                                 ? value

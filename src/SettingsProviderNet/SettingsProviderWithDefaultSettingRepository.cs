@@ -79,12 +79,14 @@ namespace SettingsProviderNet
 
             public override T GetSettings<T>(bool fresh = false)
             {
-                T settingsFromRepository = DecryptProtectedSettings(settingsRepository.Load<T>(GetKey<T>()));
+                T settingsFromRepo = DecryptProtectedSettings(settingsRepository.Load<T>(GetKey<T>()));
                 T settings = base.GetSettings<T>(fresh);
 
                 var settingsMetadata = ReadSettingMetadata<T>();
-                if (settingsMetadata.Any(m => m.ReadValue(settingsFromRepository) != m.ReadValue(settings)))
+                if (settingsMetadata.Any(m => !ObjectCompareUtil.IsEqual(m.ReadValue(settingsFromRepo), m.ReadValue(settings))))
+                {
                     SaveSettings<T>(settings);
+                }
 
                 return settings;
             }

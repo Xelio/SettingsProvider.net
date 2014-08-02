@@ -11,8 +11,16 @@ namespace SettingsProviderNet.Tests
             get { return files; }
         }
 
+        public int WriteCount { get; set; }
+
+        public TestStorage()
+        {
+            WriteCount = 0;
+        }
+
         protected override void WriteTextFile(string filename, string fileContents)
         {
+            WriteCount++;
             if (!Files.ContainsKey(filename))
                 Files.Add(filename, fileContents);
             else

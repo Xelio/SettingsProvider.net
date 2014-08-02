@@ -13,7 +13,7 @@ namespace SettingsProviderNet.Tests
         readonly SettingsProviderWithDefaultSettingRepository settingsWDSRRetreiver;
         readonly SettingsProviderWithDefaultSettingRepository settingsWDSRSaver;
 
-        readonly SettingsProvider settingsRetreiver;
+        readonly SettingsProvider settingsProvider;
 
         readonly TestStorage store;
         readonly TestStorage store2;
@@ -24,16 +24,16 @@ namespace SettingsProviderNet.Tests
 
             settingsWDSRRetreiver = new SettingsProviderWithDefaultSettingRepository(store);
             settingsWDSRSaver = new SettingsProviderWithDefaultSettingRepository(store);
-            settingsRetreiver = new SettingsProvider(store2);
+            settingsProvider = new SettingsProvider(store2);
         }
 
         [Fact]
         public void settings_provider_wdsr_would_save_default_value_to_default_repository()
-        {
+        { 
             settingsWDSRSaver.SaveSettings(new TestSettings());
 
             store2.Save<TestSettings>("TestSettings", store.Load<TestSettings>("TestSettings.default"));
-            TestSettings defaultSettings = settingsRetreiver.GetSettings<TestSettings>();
+            TestSettings defaultSettings = settingsProvider.GetSettings<TestSettings>();
 
             Assert.Equal(defaultSettings.TestProp1, "foo");
             Assert.Equal(defaultSettings.ProtectedStringWithDefault, "test");
@@ -68,6 +68,19 @@ namespace SettingsProviderNet.Tests
             TestSettings overridedSettings = store.Load<TestSettings>("TestSettings");
 
             Assert.Equal(overridedSettings.TestProp1, null);
+        }
+
+        [Fact]
+        public void settings_provider_wdsr_would_not_save_to_default_repository_twice()
+        {
+            settingsProvider.SaveSettings(new TestSettings { TestProp1 = "bar", FirstRun = DateTime.Now});
+            // Copy to defalut repository
+            store.Save<TestSettings>("TestSettings.default", store2.Load<TestSettings>("TestSettings"));
+
+            TestSettings settings = settingsWDSRSaver.GetSettings<TestSettings>();
+
+            Assert.Equal(settings.TestProp1, "bar");
+            Assert.Equal(1, store.WriteCount);
         }
 
         [Fact]
