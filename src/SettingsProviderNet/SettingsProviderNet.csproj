@@ -45,6 +45,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="EnumHelper.cs" />
+    <Compile Include="FileStorage.cs" />
     <Compile Include="ISettingDescriptor.cs" />
     <Compile Include="ISettingsProvider.cs" />
     <Compile Include="ISettingsStorage.cs" />

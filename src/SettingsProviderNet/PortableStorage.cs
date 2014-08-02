@@ -15,10 +15,8 @@ namespace SettingsProviderNet
 
         protected override void WriteTextFile(string filename, string fileContents)
         {
-            var settingsFolder = GetProgramFolder();
-            if (!Directory.Exists(settingsFolder))
-                Directory.CreateDirectory(settingsFolder);
-            File.WriteAllText(Path.Combine(settingsFolder, filename), fileContents);
+            var settingsFilename = Path.Combine(GetProgramFolder(), filename);
+            File.WriteAllText(settingsFilename, fileContents);
         }
 
         protected override string ReadTextFile(string filename)
