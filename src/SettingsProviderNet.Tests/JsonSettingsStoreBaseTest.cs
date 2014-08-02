@@ -236,6 +236,19 @@ namespace SettingsProviderNet.Tests
             Assert.Equal(new List<string>() { "abc", "def" }, settings.ListProp);
         }
 
+        [Fact]
+        public void json_setting_store_LoadAndUpdate_can_replace_list()
+        {
+            store.Save<TestListClass>("test1", new TestListClass { ListProp = new List<string>() { "abc", "def" } });
+            var test = store.Load<TestListClass>("test");
+            store.Save<TestListClass>("test1", new TestListClass { ListProp = new List<string>() { "efg", "hij" } });
+            test = store.LoadAndUpdate<TestListClass>("test", test);
+
+            var json = CompressJSON(store.Files["test1.settings"]);
+
+            Assert.Equal("{\"ListProp\": [\"efg\",\"hij\"]}", json);
+        }
+
         private class TestClass
         {
             public string StringProp { get; set; }

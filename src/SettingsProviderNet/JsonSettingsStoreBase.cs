@@ -41,7 +41,8 @@ namespace SettingsProviderNet
                 {
                     NullValueHandling = NullValueHandling.Ignore,
                     ReferenceLoopHandling = ReferenceLoopHandling.Ignore,
-                    StringEscapeHandling = StringEscapeHandling.EscapeHtml
+                    StringEscapeHandling = StringEscapeHandling.EscapeHtml,
+                    ObjectCreationHandling = ObjectCreationHandling.Replace
                 });
             }
 
