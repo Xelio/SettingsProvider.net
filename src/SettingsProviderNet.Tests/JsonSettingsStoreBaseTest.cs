@@ -68,6 +68,26 @@ namespace SettingsProviderNet.Tests
             Assert.Equal("居酒屋", settings.StringProp);
         }
 
+        [Fact]
+        public void json_setting_store_can_serialize_multiline_string()
+        {
+            store.Save<TestStringClass>("test1", new TestStringClass { StringProp = "abc" + Environment.NewLine + "123" });
+
+            var json = CompressJSON(store.Files["test1.settings"]);
+
+            Assert.Equal("{\"StringProp\": \"abc\\r\\n123\"}", json);
+        }
+
+        [Fact]
+        public void json_setting_store_can_deserialize_multiline_string()
+        {
+            store.Files["test1.settings"] = "{\"StringProp\": \"abc\\r\\n123\"}";
+
+            TestStringClass settings = store.Load<TestStringClass>("test1");
+
+            Assert.Equal("abc" + Environment.NewLine + "123", settings.StringProp);
+        }
+
         private class TestIntClass
         {
             public int IntProp { get; set; }
